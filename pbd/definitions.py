@@ -141,12 +141,12 @@ def write_json(file, json_obj):
 def extract_string(buffer, start_index):
     if len(buffer) > start_index and buffer[start_index] == 0:
         return ''
-    ch = buffer[start_index: start_index + 2].decode('utf16')
+    ch = buffer[start_index: start_index + 2].decode('utf-16-le')
     output = ''
     while ch and ch != '\0':
         output += ch
         start_index += 2
-        ch = buffer[start_index: start_index + 2].decode('utf16')
+        ch = buffer[start_index: start_index + 2].decode('utf-16-le')
     return output
 
 
@@ -163,9 +163,10 @@ def get_type_name(type_id):
     global glb_types
     if type_id == 0:
         return 'undef'
-    elif type_id > 0x8000:
-        if len(glb_types) > type_id - 0x8000:
-            return glb_types[type_id - 0x8000].name
+    elif type_id & 0x8000:
+        index = type_id & 0x3fff
+        if len(glb_types) > index:
+            return glb_types[index].name
         else:
             return "[{}]".format(hex(type_id))
     else:
@@ -563,7 +564,7 @@ class FuncInfo(object):
         if access == 1:
             self.access = "private"
         elif access == 2:
-            self.access = "proteced"
+            self.access = "protected"
         else:
             self.access = "public"
         self.is_event = (self.m_1f & 0x1) == 1
@@ -1087,7 +1088,12 @@ class GroupClass(object):
                 with open(os.path.join(current_path, "instance_vars.txt"), "w") as file:
                     for item in instanceVars:
                         file.write("{} {} = {}\n".format(item.type_name, item.name, item.value))
+        seen_names = {}
         for func in self.functions:
+            base_name = func.name
+            seen_names[base_name] = seen_names.get(base_name, 0) + 1
+            overload_index = seen_names[base_name]
+            file_base = base_name if overload_index == 1 else "{}_{}".format(base_name, overload_index)
             lines = None
             lines_debug = None
             try:
@@ -1100,14 +1106,14 @@ class GroupClass(object):
                 raise ex
             finally:
                 if func.routine is not None and lines_debug is not None:
-                    with open(os.path.join(current_path, func.name + ".debug"), "w") as file:
+                    with open(os.path.join(current_path, file_base + ".debug"), "w") as file:
                         file.write("\n".join(lines_debug))
             if func.routine is not None and lines is not None:
-                with open(os.path.join(current_path, func.name + ".code"), "w") as file:
+                with open(os.path.join(current_path, file_base + ".code"), "w") as file:
                     file.write("\n".join(lines))
                 if func.routine.stack:
                     print("warning: stack is not empty in file: {}".format(
-                        os.path.join(current_path, func.name + ".code")))
+                        os.path.join(current_path, file_base + ".code")))
 
 
 glb_symbol = list()
@@ -1130,6 +1136,13 @@ class Group(object):
         global glb_def_slot
         glb_symbol = list()
         glb_def_slot = list()
+        glb_types = Lookup.__new__(Lookup)
+        glb_types.items = []
+        glb_enums = Lookup.__new__(Lookup)
+        glb_enums.items = []
+        glb_const = ConstData(None, b'', b'')
+        const_28 = ConstData(None, b'', b'')
+        const_30 = ConstData(None, b'', b'')
         self.group_name = ''
         file_path = os.path.abspath(file_name)
         file_name = os.path.basename(file_path)
@@ -1190,7 +1203,7 @@ class Group(object):
             for var in glb_types:
                 write_json(file, var.__dict__())
         if glb_enums is not None and len(glb_enums) > 0:
-            with open(os.path.join(base_path, "global_enums.josn"), "w") as file:
+            with open(os.path.join(base_path, "global_enums.json"), "w") as file:
                 for var in glb_enums:
                     write_json(file, var.__dict__())
                     # file.write("{}\n".format(var.__dict__()))

@@ -27,22 +27,22 @@ def print_progress_bar(iteration, total, prefix='', suffix='', decimals=1, lengt
 
 
 class Header:
-    id = 'HDR*'
+    id = b'HDR*'
 
     def __init__(self, file):
-        self.program_name = file.read(24).decode('utf16')
+        self.program_name = file.read(24).decode('utf-16-le')
         file.seek(4, 1)
-        self.program_version = file.read(8).decode('utf16')
+        self.program_version = file.read(8).decode('utf-16-le')
         self.creation_date = datetime.utcfromtimestamp(struct.unpack("<I", file.read(4))[0])
         file.seek(2, 1)
-        self.library_comment = file.read(512).decode('utf16')
+        self.library_comment = file.read(512).decode('utf-16-le')
         self.offset_scc_data = struct.unpack("<I", file.read(4))[0]
         self.size_scc_data = struct.unpack("<I", file.read(4))[0]
         file.seek(458, 1)
 
 
 class Bitmap:
-    id = 'FRE*'
+    id = b'FRE*'
 
     def __init__(self, file):
         self.offset_next_block = struct.unpack("<I", file.read(4))[0]
@@ -50,7 +50,7 @@ class Bitmap:
 
 
 class Node:
-    id = 'NOD*'
+    id = b'NOD*'
 
     def __init__(self, file):
         self.loc = file.tell()
@@ -64,24 +64,35 @@ class Node:
         file.seek(8, 1)
         self.chunks = []
         for x in range(self.entry_count):
+            pos = file.tell()
             chunk = read_block(file)
             if not isinstance(chunk, Chunk):
-                raise Exception("file format error: expect chunk block")
+                file.seek(pos)
+                bad_id = file.read(4)
+                raise Exception(
+                    "file format error: at pos={} expected ENT* but got {} "
+                    "(entry_count={}, index={}, space_left={}, loc={})".format(
+                        pos, bad_id, self.entry_count, x, self.space_left, self.loc))
             self.chunks.append(chunk)
         file.seek(self.space_left, 1)
 
 
 class Chunk:
-    id = 'ENT*'
+    id = b'ENT*'
 
     def __init__(self, file):
-        self.version = file.read(8).decode('utf16')
+        chunk_start = file.tell()
+        self.version = file.read(8).decode('utf-16-le')
         self.offset_first_data_block = struct.unpack("<I", file.read(4))[0]
         self.object_size = struct.unpack("<I", file.read(4))[0]
         self.object_date = datetime.utcfromtimestamp(struct.unpack("<I", file.read(4))[0])
         self.comment_length = struct.unpack("<H", file.read(2))[0]
+        if self.comment_length > 0:
+            print("[diag] ENT* at {} has comment_length={}, skipping {} bytes".format(
+                chunk_start, self.comment_length, self.comment_length))
+            file.seek(self.comment_length, 1)
         length = struct.unpack("<H", file.read(2))[0]
-        self.object_name = file.read(length).decode('utf16').strip('\x00')
+        self.object_name = file.read(length).decode('utf-16-le').strip('\x00')
         self.data = b''
 
     def save(self, input_stream, base_path):
@@ -134,7 +145,7 @@ class Chunk:
 
 
 class Data:
-    id = 'DAT*'
+    id = b'DAT*'
 
     def __init__(self, file):
         self.offset_next = struct.unpack("<I", file.read(4))[0]
@@ -143,7 +154,7 @@ class Data:
 
 
 def read_block(file):
-    _id = file.read(4).decode()
+    _id = file.read(4)
     if _id == Header.id:
         return Header(file)
     elif _id == Bitmap.id:
@@ -154,6 +165,7 @@ def read_block(file):
         return Chunk(file)
     elif _id == Data.id:
         return Data(file)
+    return None
 
 
 def get_node(file, parent_node):

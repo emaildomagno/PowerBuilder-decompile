@@ -15,7 +15,7 @@ for file in os.listdir(sys.argv[1]):
     if dot_index == -1:
         continue
     ext = file[dot_index + 1:]
-    if not ext.lower() in ("win", "fun", "udo"):
+    if not ext.lower() in ("win", "fun", "udo", "men", "apl"):
         print("{} skipped from analysis".format(file))
         continue
     # print(file)

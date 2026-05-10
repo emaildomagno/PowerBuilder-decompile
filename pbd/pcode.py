@@ -39,7 +39,7 @@ def pb_negate(stack, pcode, routine):
 def pb_div(stack, pcode, routine):
     if len(stack) < 2:
         raise Exception("pb_div need 2 args")
-    expr_2 = routine.stack.pop()
+    expr_2 = stack.pop()
     expr_1 = stack.pop()
     stack.append("{} / {}".format(expr_1, expr_2))
 
@@ -417,6 +417,8 @@ def pb_db_select(stack, pcode, routine):
     page_id = pcode.args[1] - 0x8000
     loc = (page_id * 0x10000) + pcode.args[0]
     stmt = definitions.glb_const.data_at(loc)
+    if not stmt:
+        raise Exception("select statement not found at loc: {}".format(hex(loc)))
     if stmt.select_stmt_loc == 0xffff:
         raise Exception("no select statement found")
     stmt_1 = definitions.glb_const.data_at(stmt.select_stmt_loc)
