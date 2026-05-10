@@ -27,7 +27,7 @@ def print_progress_bar(iteration, total, prefix='', suffix='', decimals=1, lengt
 
 
 class Header:
-    id = 'HDR*'
+    id = b'HDR*'
 
     def __init__(self, file):
         self.program_name = file.read(24).decode('utf-16-le')
@@ -42,7 +42,7 @@ class Header:
 
 
 class Bitmap:
-    id = 'FRE*'
+    id = b'FRE*'
 
     def __init__(self, file):
         self.offset_next_block = struct.unpack("<I", file.read(4))[0]
@@ -50,7 +50,7 @@ class Bitmap:
 
 
 class Node:
-    id = 'NOD*'
+    id = b'NOD*'
 
     def __init__(self, file):
         self.loc = file.tell()
@@ -72,7 +72,7 @@ class Node:
 
 
 class Chunk:
-    id = 'ENT*'
+    id = b'ENT*'
 
     def __init__(self, file):
         self.version = file.read(8).decode('utf-16-le')
@@ -135,7 +135,7 @@ class Chunk:
 
 
 class Data:
-    id = 'DAT*'
+    id = b'DAT*'
 
     def __init__(self, file):
         self.offset_next = struct.unpack("<I", file.read(4))[0]
@@ -144,7 +144,7 @@ class Data:
 
 
 def read_block(file):
-    _id = file.read(4).decode()
+    _id = file.read(4)
     if _id == Header.id:
         return Header(file)
     elif _id == Bitmap.id:
@@ -155,6 +155,7 @@ def read_block(file):
         return Chunk(file)
     elif _id == Data.id:
         return Data(file)
+    return None
 
 
 def get_node(file, parent_node):
