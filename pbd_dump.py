@@ -64,9 +64,15 @@ class Node:
         file.seek(8, 1)
         self.chunks = []
         for x in range(self.entry_count):
+            pos = file.tell()
             chunk = read_block(file)
             if not isinstance(chunk, Chunk):
-                raise Exception("file format error: expect chunk block")
+                file.seek(pos)
+                bad_id = file.read(4)
+                raise Exception(
+                    "file format error: at pos={} expected ENT* but got {} "
+                    "(entry_count={}, index={}, space_left={}, loc={})".format(
+                        pos, bad_id, self.entry_count, x, self.space_left, self.loc))
             self.chunks.append(chunk)
         file.seek(self.space_left, 1)
 
@@ -75,12 +81,16 @@ class Chunk:
     id = b'ENT*'
 
     def __init__(self, file):
+        chunk_start = file.tell()
         self.version = file.read(8).decode('utf-16-le')
         self.offset_first_data_block = struct.unpack("<I", file.read(4))[0]
         self.object_size = struct.unpack("<I", file.read(4))[0]
         self.object_date = datetime.utcfromtimestamp(struct.unpack("<I", file.read(4))[0])
         self.comment_length = struct.unpack("<H", file.read(2))[0]
-        file.seek(self.comment_length, 1)
+        if self.comment_length > 0:
+            print("[diag] ENT* at {} has comment_length={}, skipping {} bytes".format(
+                chunk_start, self.comment_length, self.comment_length))
+            file.seek(self.comment_length, 1)
         length = struct.unpack("<H", file.read(2))[0]
         self.object_name = file.read(length).decode('utf-16-le').strip('\x00')
         self.data = b''
