@@ -30,12 +30,12 @@ class Header:
     id = 'HDR*'
 
     def __init__(self, file):
-        self.program_name = file.read(24).decode('utf16')
+        self.program_name = file.read(24).decode('utf-16-le')
         file.seek(4, 1)
-        self.program_version = file.read(8).decode('utf16')
+        self.program_version = file.read(8).decode('utf-16-le')
         self.creation_date = datetime.utcfromtimestamp(struct.unpack("<I", file.read(4))[0])
         file.seek(2, 1)
-        self.library_comment = file.read(512).decode('utf16')
+        self.library_comment = file.read(512).decode('utf-16-le')
         self.offset_scc_data = struct.unpack("<I", file.read(4))[0]
         self.size_scc_data = struct.unpack("<I", file.read(4))[0]
         file.seek(458, 1)
@@ -75,13 +75,14 @@ class Chunk:
     id = 'ENT*'
 
     def __init__(self, file):
-        self.version = file.read(8).decode('utf16')
+        self.version = file.read(8).decode('utf-16-le')
         self.offset_first_data_block = struct.unpack("<I", file.read(4))[0]
         self.object_size = struct.unpack("<I", file.read(4))[0]
         self.object_date = datetime.utcfromtimestamp(struct.unpack("<I", file.read(4))[0])
         self.comment_length = struct.unpack("<H", file.read(2))[0]
+        file.seek(self.comment_length, 1)
         length = struct.unpack("<H", file.read(2))[0]
-        self.object_name = file.read(length).decode('utf16').strip('\x00')
+        self.object_name = file.read(length).decode('utf-16-le').strip('\x00')
         self.data = b''
 
     def save(self, input_stream, base_path):

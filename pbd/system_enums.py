@@ -5,7 +5,7 @@ class EnumInfo(object):
         self.m_6 = m_6
 
     def __str__(self):
-        pass
+        return "{}!".format(self.name)
 
 
 enum_main = dict()
